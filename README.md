@@ -7,7 +7,7 @@ calculates individual trajectories of a number of bodies, taking into account gr
 interactions.
 
 Since the straightforward approach of direct sums over all the bodies in the system has a compu-
-tational cost that grows as O(N^2), we are going to implement Barners-Hut algorithm, which grows
+tational cost that grows as O(N^2), we are going to implement Barnes-Hut algorithm, which grows
 as O(N*log(N)). This is specially important, since we want to simulate trajectories for a number
 of bodies > 1000.
 
@@ -18,5 +18,5 @@ a 3D render framework written in C++.
 # Summary
 - N-Body simulation program, for N > 1000.
 - Using CUDA for computing.
-- Barners-Hut algorithm for less complexity.
+- Barnes-Hut algorithm for less complexity.
 - 3D representation of final results using Unreal Engine 4.
