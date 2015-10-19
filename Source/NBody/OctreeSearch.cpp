@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "NBody.h"
-#include "kernel_wrapper.h"
 #include "OctreeSearch.h"
+
 
 // Sets default values
 AOctreeSearch::AOctreeSearch() : Size(0), ParticleOctree(NULL), Initialized(false), ShowOctree(false), PhDeltaTime(0.01)
@@ -14,15 +14,13 @@ AOctreeSearch::AOctreeSearch() : Size(0), ParticleOctree(NULL), Initialized(fals
 // Called when the game starts or when spawned
 void AOctreeSearch::BeginPlay()
 {
-  Super::BeginPlay();
+	Super::BeginPlay();
 }
 
 // Called every frame
 void AOctreeSearch::Tick( float DeltaTime )
 {
-  Super::Tick(DeltaTime);
-  print(FString::SanitizeFloat(kernel(1<<20)));
-
+	Super::Tick( DeltaTime );
   FlushPersistentDebugLines(GetWorld());
   if (PhDeltaTime > 0) {
     ComputeCubeSize();

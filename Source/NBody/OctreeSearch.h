@@ -17,6 +17,7 @@ struct FParticle {
   FParticle() : Mass(0), Position(FVector::ZeroVector), Velocity(FVector::ZeroVector), Acceleration(FVector::ZeroVector) {}
 };
 
+
 class Octree
 {
 private:
@@ -25,12 +26,11 @@ private:
   float Size;
   float TotalMass;
   FVector CenterOfMass;
-  float Epsilon;
 
   Octree *Children[8];
 
 public:
-  Octree(const FVector& Origin, float Size) : Particle(NULL), Origin(Origin), Size(Size), TotalMass(0), CenterOfMass(FVector::ZeroVector), Epsilon(0.1) {
+  Octree(const FVector& Origin, float Size) : Particle(NULL), Origin(Origin), Size(Size), TotalMass(0), CenterOfMass(FVector::ZeroVector) {
     for (int32 i = 0; i < 8; i++) { Children[i] = NULL; }
   }
 
@@ -98,8 +98,8 @@ public:
 
   void ComputeForces(FParticle* Particle, float Theta) {
     if (IsLeafNode() && this->Particle == NULL) { return; }
-    float d = FVector::Dist(CenterOfMass, Particle->Position) + Epsilon;
-    if (Particle == this->Particle) { return; }
+    float d = FVector::Dist(CenterOfMass, Particle->Position);
+    if (d == 0) { return; }
     if (Size / d < Theta || this->Particle) {
       Particle->Acceleration += 1e4*TotalMass/pow(d,3) * (CenterOfMass - Particle->Position);
     } else if(!IsLeafNode()) {
