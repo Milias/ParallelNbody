@@ -4,3 +4,4 @@
 
 #include "Engine.h"
 
+#define print(text) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3, FColor::White,text)
