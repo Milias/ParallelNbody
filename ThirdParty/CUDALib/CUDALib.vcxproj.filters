@@ -28,5 +28,8 @@
     <ClInclude Include="Includes\kernel_wrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Includes\kernel.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

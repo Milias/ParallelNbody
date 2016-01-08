@@ -1,9 +1,17 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
+#include <functional>
+#undef NDEBUG
+#include <assert.h>
+#include <string>
+#include <cstdint>
 #include "GameFramework/Actor.h"
+#include "kernel_wrapper.h"
 #include "OctreeSearch.generated.h"
+
+typedef unsigned long long uint64_t;
 
 USTRUCT()
 struct FParticle {
@@ -13,8 +21,10 @@ struct FParticle {
   FVector Position;
   FVector Velocity;
   FVector Acceleration;
-  
-  FParticle() : Mass(0), Position(FVector::ZeroVector), Velocity(FVector::ZeroVector), Acceleration(FVector::ZeroVector) {}
+
+  FString s;
+
+  FParticle() : Mass(0), Position(FVector::ZeroVector), Velocity(FVector::ZeroVector), Acceleration(FVector::ZeroVector), s("") {}
 };
 
 class Octree
@@ -108,15 +118,138 @@ public:
   }
 };
 
+struct LinearCell {
+  FParticle* Particle;
+  uint64_t Origin;
+  char Level;
+  float Size;
+  float TotalMass;
+  FVector CenterOfMass;
+  float Epsilon;
+
+  LinearCell *Parent;
+  LinearCell *Children[8];
+
+  LinearCell(LinearCell* Parent, char Level, uint64_t Origin, float Size, float Epsilon = 0.1) : Parent(Parent), Level(Level), Origin(Origin), Size(Size), Epsilon(Epsilon) {
+    assert(Level < 21 && Level >= 0);
+  }
+
+  ~LinearCell() {
+    if (Children[0] != NULL) {
+      for (char i = 0; i < 8; i++) { delete Children[i]; }
+    }
+  }
+
+  bool IsLeafNode() { return Children[0] == NULL; }
+};
+
+class LinearOctree
+{
+private:
+  char MaxDepth;
+  float MaxSize;
+
+  LinearCell **Cells;
+
+  uint64_t SplitBy3(uint64_t x) {
+    x &= 0x1fffff;
+    x = (x | (x <<  32)) & 0x1f00000000ffff;
+    x = (x | (x <<  16)) & 0x1f0000ff0000ff;
+    x = (x | (x << 8)) & 0x100f00f00f00f00f;
+    x = (x | (x << 4)) & 0x10c30c30c30c30c3;
+    x = (x | (x << 2)) & 0x1249249249249249;
+    return x;
+  }
+
+  uint64_t MagicBits(uint64_t x, uint64_t y, uint64_t z) {
+    return SplitBy3(x) | SplitBy3(y) << 1 | SplitBy3(z) << 2;
+  }
+
+public:
+  TArray<FParticle*> Particles;
+  LinearOctree() : MaxDepth(21), MaxSize(1 << 20) {}
+  ~LinearOctree() {}
+
+  uint64_t Encode(FVector p) {
+    //Assuming p.i in [0,1)
+    uint64_t x, y, z;
+    x = (uint64_t)p.X;
+    y = (uint64_t)p.Y;
+    z = (uint64_t)p.Z;
+    return MagicBits(x, y, z);
+  }
+
+  LinearCell* CreateChildren(LinearCell* Parent) {
+    assert(Parent->Level + 1 < MaxDepth);
+    uint64_t Anchor;
+    for (int32 i = 0; i < 8; i++) {
+      Anchor = Parent->Origin | (i << 3 * (Parent->Level + 1));
+      Parent->Children[i] = new LinearCell(Parent, Parent->Level + 1, Anchor, Parent->Size * 0.5, Parent->Epsilon);
+    }
+    return Parent->Children[0];
+  }
+
+  void AllocateParticles(TArray<FParticle>& ParticleArray)
+  {
+    Particles.SetNum(ParticleArray.Num());
+    for (uint64_t j = 0; j < Particles.Num(); j++) {
+      Particles[j] = &ParticleArray[j];
+    }
+  }
+
+  void SortParticles()
+  {
+    bool *e = new bool[Particles.Num()];
+    uint64_t *f = new uint64_t[Particles.Num()];
+    
+    for (uint64_t j = 0; j < Particles.Num(); j++) {
+      e[j] = false;
+      f[j] = 0;
+    }
+    
+    TArray<FParticle*> SortedParticles; SortedParticles.SetNum(Particles.Num());
+    uint64_t totalFalses;
+    for (uint64_t i = 0; i < 64; i++) {
+      for (uint64_t j = 0; j < Particles.Num(); j++) {
+        e[j] = ((Encode(Particles[j]->Position) & 1i64 << i) >> i) == 0;
+        if (j > 0) f[j] = (e[j-1] ? 1 : 0) + f[j - 1];
+      }
+      totalFalses = (e[Particles.Num() - 1] ? 1 : 0) + f[Particles.Num() - 1];
+      for (uint64_t j = 0; j < Particles.Num(); j++) {
+        SortedParticles[e[j] ? f[j] : j - f[j] + totalFalses] = Particles[j];
+      }
+      for (uint64_t j = 0; j < Particles.Num(); j++) {
+        Particles[j] = SortedParticles[j];
+      }
+    }
+
+    delete[] e; delete[] f;
+  }
+  
+  LinearCell* Traverse(LinearCell* UCell, uint64_t Loc) {
+    LinearCell* cell = UCell;
+    char Level = UCell->Level - 1;
+    uint64_t childIndex;
+    while (cell->Children) {
+      childIndex = (Loc & (7 << 3 * Level)) >> 3 * Level;
+      cell = cell->Children[childIndex];
+    }
+    return cell;
+  }
+};
+
 UCLASS()
 class NBODY_API AOctreeSearch : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
   float Size;
   TArray<FParticle> Particles;
-  Octree* ParticleOctree;
+  Octree *ParticleOctree;
+  LinearOctree *LinOctree;
+
+  NBodyKernel *Ker;
 
   bool Initialized;
 
@@ -126,13 +259,8 @@ public:
   UPROPERTY(BlueprintReadWrite)
   float PhDeltaTime;
 
-	// Sets default values for this actor's properties
 	AOctreeSearch();
-
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	
-	// Called every frame
 	virtual void Tick( float DeltaSeconds ) override;
 
   void DrawOctreeBoxes(Octree* Oct);

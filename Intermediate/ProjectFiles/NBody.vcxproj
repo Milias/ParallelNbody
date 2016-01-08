@@ -124,7 +124,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugGame_Game|x64'">
-    <IncludePath>$(SolutionDir)ThirdParty\CUDALib\Includes</IncludePath>
     <ReferencePath />
     <LibraryPath>
     </LibraryPath>
@@ -137,12 +136,12 @@
     <NMakeReBuildCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Rebuild.bat" NBody Win64 DebugGame "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Clean.bat" NBody Win64 DebugGame "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeCleanCommandLine>
     <NMakeOutput>..\..\Binaries\Win64\NBody-Win64-DebugGame.exe</NMakeOutput>
+    <IncludePath>$(CUDA_PATH)\include;$(SolutionDir)ThirdParty\CUDALib\Includes;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebugGame_Editor|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugGame_Editor|x64'">
-    <IncludePath>$(SolutionDir)ThirdParty\CUDALib\Includes</IncludePath>
     <ReferencePath />
     <LibraryPath>
     </LibraryPath>
@@ -155,6 +154,7 @@
     <NMakeReBuildCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Rebuild.bat" NBodyEditor Win64 DebugGame "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Clean.bat" NBodyEditor Win64 DebugGame "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeCleanCommandLine>
     <NMakeOutput>C:\Program Files\Epic Games\4.9\Engine\Binaries\Win64\UE4Editor.exe</NMakeOutput>
+    <IncludePath>$(CUDA_PATH)\include;$(SolutionDir)ThirdParty\CUDALib\Includes;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Development_Game|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -188,7 +188,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development_Game|x64'">
-    <IncludePath>$(SolutionDir)ThirdParty\CUDALib\Includes</IncludePath>
     <ReferencePath />
     <LibraryPath>
     </LibraryPath>
@@ -201,12 +200,12 @@
     <NMakeReBuildCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Rebuild.bat" NBody Win64 Development "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Clean.bat" NBody Win64 Development "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeCleanCommandLine>
     <NMakeOutput>..\..\Binaries\Win64\NBody.exe</NMakeOutput>
+    <IncludePath>$(CUDA_PATH)\include;$(SolutionDir)ThirdParty\CUDALib\Includes;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Development_Editor|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development_Editor|x64'">
-    <IncludePath>$(SolutionDir)ThirdParty\CUDALib\Includes</IncludePath>
     <ReferencePath />
     <LibraryPath>
     </LibraryPath>
@@ -219,6 +218,7 @@
     <NMakeReBuildCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Rebuild.bat" NBodyEditor Win64 Development "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Clean.bat" NBodyEditor Win64 Development "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeCleanCommandLine>
     <NMakeOutput>C:\Program Files\Epic Games\4.9\Engine\Binaries\Win64\UE4Editor.exe</NMakeOutput>
+    <IncludePath>$(CUDA_PATH)\include;$(SolutionDir)ThirdParty\CUDALib\Includes;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Shipping_Game|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -241,7 +241,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Shipping_Game|x64'">
-    <IncludePath>$(SolutionDir)ThirdParty\CUDALib\Includes</IncludePath>
     <ReferencePath />
     <LibraryPath>
     </LibraryPath>
@@ -254,6 +253,7 @@
     <NMakeReBuildCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Rebuild.bat" NBody Win64 Shipping "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine>"C:\Program Files\Epic Games\4.9\Engine\Build\BatchFiles\Clean.bat" NBody Win64 Shipping "$(SolutionDir)$(ProjectName).uproject" -rocket -waitmutex</NMakeCleanCommandLine>
     <NMakeOutput>..\..\Binaries\Win64\NBody-Win64-Shipping.exe</NMakeOutput>
+    <IncludePath>$(CUDA_PATH)\include;$(SolutionDir)ThirdParty\CUDALib\Includes;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Source\NBody\OctreeSearch.cpp" />

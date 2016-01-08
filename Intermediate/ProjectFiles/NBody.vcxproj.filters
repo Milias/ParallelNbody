@@ -43,18 +43,18 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source\NBody\UnrealEngine">
+    <Filter Include="Source\NBody\Octree">
       <UniqueIdentifier>{5caf6e7b-28c6-4dc4-8636-c050095f8d37}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Source\NBody\OctreeSearch.h">
-      <Filter>Source\NBody\UnrealEngine</Filter>
-    </ClInclude>
+    <ClCompile Include="..\..\Source\NBody\OctreeSearch.cpp">
+      <Filter>Source\NBody\Octree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Source\NBody\OctreeSearch.cpp">
-      <Filter>Source\NBody\UnrealEngine</Filter>
-    </ClCompile>
+    <ClInclude Include="..\..\Source\NBody\OctreeSearch.h">
+      <Filter>Source\NBody\Octree</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -2,7 +2,3 @@
 
 #include "NBody.h"
 #include "NBodyGameMode.h"
-
-
-
-

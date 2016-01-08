@@ -5,15 +5,9 @@
 #include "GameFramework/GameMode.h"
 #include "NBodyGameMode.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class NBODY_API ANBodyGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	
-	
-	
-	
+
 };

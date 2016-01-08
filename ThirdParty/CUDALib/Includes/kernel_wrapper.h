@@ -1,3 +1,3 @@
 #pragma once
 
-float kernel(int size);
+#include "kernel.cuh"
