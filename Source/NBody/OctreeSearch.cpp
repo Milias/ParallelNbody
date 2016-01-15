@@ -20,6 +20,7 @@ void AOctreeSearch::BeginPlay()
 void AOctreeSearch::Tick( float DeltaTime )
 {
   Super::Tick(DeltaTime);
+  //if (Initialized) { Ker->GPUBuildOctree(); }
 
   //print(FString::SanitizeFloat(kernel(Particles.Num())));
   /*
@@ -69,6 +70,7 @@ FString ToBinary(UINT64 x)
 
 void AOctreeSearch::CreateSpacePoints(int32 N, float SizeArg)
 {
+  N = 16;
   Size = SizeArg;
   FVector s = FVector(SizeArg, SizeArg, SizeArg/10);
   Particles.Empty();
@@ -80,18 +82,29 @@ void AOctreeSearch::CreateSpacePoints(int32 N, float SizeArg)
     Particles[i].Position = i == 0 ? 0.5*s : FMath::RandPointInBox(FBox(FVector::ZeroVector, s));
     Particles[i].Velocity = i == 0 ? FVector::ZeroVector : 10 * FMath::RandRange(25.0, 50.0)*FMath::VRand();
     Particles[i].Mass = i == 0 ? 5000.0 : FMath::RandRange(1.0, 5000.0);
-    p[i].x = Particles[i].Position.X;
-    p[i].y = Particles[i].Position.Y;
-    p[i].z = Particles[i].Position.Z;
+    p[i].x = Particles[i].Position.X / Size * (1 << 21);
+    p[i].y = Particles[i].Position.Y / Size * (1 << 21);
+    p[i].z = Particles[i].Position.Z / Size / 10 * (1 << 21);
     p[i].w = Particles[i].Mass;
   }
   Initialized = true;
 
   if (Ker == NULL) { Ker = new NBodyKernel(); }
   Ker->Initialize(N, p);
-  Ker->GPUBuildOctree();
-  Ker->CopyEncodedToHost();
+  Ker->CPUBuildOctree();
+  //Ker->CopyEncodedToHost();
 
+  FString msg;
+  for (int32 i = 0; i < N; i++) {
+    msg = "";
+    for (int j = 0; j < 64; j++) {
+      msg += (Ker->Encoded[i] & 1i64 << j) >> j ? "1" : "0";
+    }
+    print(FString((std::to_string(i) + ", " + std::to_string(Ker->Encoded[i])).c_str()));
+    Particles[i].s = msg;
+  }
+
+  /*
   uint64_t *t = new uint64_t[N];
   bool *flags = new bool[N];
   uint64_t mask = 0;
@@ -107,7 +120,7 @@ void AOctreeSearch::CreateSpacePoints(int32 N, float SizeArg)
       //print("Level: " + FString(std::to_string(i).c_str()) + ", " + FString(std::to_string(mask).c_str()));
     }
   }
-
+  */
   FlushPersistentDebugLines(GetWorld());
   UGameplayStatics::GetPlayerController(this, 0)->GetHUD()->RemoveAllDebugStrings();
   for (int32 i = 0; i < N; i++) {
@@ -115,7 +128,7 @@ void AOctreeSearch::CreateSpacePoints(int32 N, float SizeArg)
     DrawDebugString(GetWorld(), Particles[i].Position, Particles[i].s, this, FColor::Red, -1.0f);
   }
 
-  delete[] t;
+  //delete[] t;
 
   //LinearOctree p2;
   //uint64_t enc;
