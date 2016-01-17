@@ -52,8 +52,8 @@ Global
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development Editor|Win32.Build.0 = Development_Editor|Win32
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development Editor|Win64.ActiveCfg = Development_Editor|x64
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development Editor|Win64.Build.0 = Development_Editor|x64
-		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win32.ActiveCfg = Development_Game|Win32
-		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win32.Build.0 = Development_Game|Win32
+		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win32.ActiveCfg = Development_Game|x64
+		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win32.Build.0 = Development_Game|x64
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win64.ActiveCfg = Development_Game|x64
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Development|Win64.Build.0 = Development_Game|x64
 		{5A5C6BF3-B19C-4732-81AB-EE84C2E00615}.Shipping|Win32.ActiveCfg = Shipping_Game|Win32

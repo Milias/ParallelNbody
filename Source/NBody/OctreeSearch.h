@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <chrono>
+#include <fstream>
+#include <string>
 #include "GameFramework/Actor.h"
 #include "OctreeSearch.generated.h"
 
@@ -117,6 +120,8 @@ public:
   float Size;
   TArray<FParticle> Particles;
   Octree* ParticleOctree;
+
+  std::fstream output;
 
   bool Initialized;
 

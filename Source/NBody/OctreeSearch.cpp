@@ -8,6 +8,7 @@ AOctreeSearch::AOctreeSearch() : Size(0), ParticleOctree(NULL), Initialized(fals
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+  output.open("results.txt", std::fstream::out | std::fstream::app);
 }
 
 // Called when the game starts or when spawned
@@ -23,14 +24,16 @@ void AOctreeSearch::Tick( float DeltaTime )
 
   FlushPersistentDebugLines(GetWorld());
   if (PhDeltaTime > 0) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> t1 = std::chrono::high_resolution_clock::now();
     ComputeCubeSize();
     CreateOctree();
     for (int32 i = 0; i < Particles.Num(); i++) {
       Particles[i].Velocity += PhDeltaTime*Particles[i].Acceleration;
       Particles[i].Position += PhDeltaTime*Particles[i].Velocity;
     }
+    //output << std::to_string(std::chrono::duration<double>(std::chrono::high_resolution_clock::now()- t1).count()) << std::endl;
   }
-  DrawOctreeBoxes(ParticleOctree);
+  //DrawOctreeBoxes(ParticleOctree);
 }
 
 void AOctreeSearch::DrawOctreeBoxes(Octree* Oct)
