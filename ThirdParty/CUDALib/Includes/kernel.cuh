@@ -5,80 +5,75 @@
 #include <stdlib.h>
 #include <vector_types.h>
 
-struct KerParticle;
-struct KerNode;
-
-struct KerNode
-{
-  KerNode * LeftNode;
-  KerNode * RightNode;
-
-  KerParticle * Particle;
-  KerNode * ParentNode;
-  float4 CenterOfMass;
-
-  uint2 Range;
-
-  __host__ __device__ KerNode() : LeftNode(NULL), RightNode(NULL), Particle(NULL), ParentNode(NULL) {}
-  __host__ __device__ uint32_t GetCount(uint64_t * Encoded);
-};
-
 struct KerParticle
 {
   float4 Position;
+  float3 Velocity;
   float3 Acceleration;
-  KerNode * ParentNode;
   uint64_t Morton;
+  uint32_t Parent;
 
-  __host__ __device__ KerParticle() : ParentNode(NULL) {}
+  __host__ __device__ KerParticle() : Morton(0), Parent(0) {}
   __host__ __device__ KerParticle& operator=(const KerParticle& p) {
     Position = p.Position;
+    Velocity = p.Velocity;
     Acceleration = p.Acceleration;
-    ParentNode = p.ParentNode;
     Morton = p.Morton;
+    Parent = p.Parent;
     return *this;
   }
 };
 
-struct KerOctreeNode
+struct CompareParticleX
 {
-  float4 CenterOfMass;
-  uint64_t Morton;
-  uint32_t Pointer;
-  KerParticle * Particle;
-  KerOctreeNode ** Children;
-  KerOctreeNode * Parent;
-  KerNode * RadixParent;
-  uint8_t Level;
-
-  __host__ __device__ KerOctreeNode() : Morton(0), Pointer(0), Particle(NULL), Children(NULL), Parent(NULL), RadixParent(NULL), Level(0) {}
-
-  __host__ __device__ ~KerOctreeNode() {
-    if (Children != NULL) { delete[] Children; }
+  __host__ __device__ bool operator()(const KerParticle &a, const KerParticle &b)
+  {
+    return a.Position.x < b.Position.x;
   }
+};
 
-  __host__ __device__ KerOctreeNode& operator=(const KerOctreeNode& p) {
-    CenterOfMass = p.CenterOfMass;
-    Morton = p.Morton;
-    Children = p.Children;
-    Parent = p.Parent;
-    Level = p.Level;
-    return *this;
+struct CompareParticleY
+{
+  __host__ __device__ bool operator()(const KerParticle &a, const KerParticle &b)
+  {
+    return a.Position.y < b.Position.y;
   }
+};
 
-  __host__ __device__ void CreateChildren() {
-    Children = new KerOctreeNode*[8];
-  }
-
-  __host__ __device__ void SetChild(KerOctreeNode *p) {
-    if (Pointer >= 8) return;
-    Children[Pointer] = p; Pointer++;
+struct CompareParticleZ
+{
+  __host__ __device__ bool operator()(const KerParticle &a, const KerParticle &b)
+  {
+    return a.Position.z < b.Position.z;
   }
 };
 
 struct TreeCell
 {
   uint2 Range;
+  uint64_t Morton;
+  uint32_t Level;
+  bool Leaf;
+
+  uint32_t Parent;
+  uint32_t Child;
+  KerParticle * Particle;
+
+  float4 Position;
+
+  __host__ __device__ TreeCell() : Morton(0), Level(0), Leaf(false), Parent(NULL), Child(NULL), Particle(NULL) {}
+  __host__ __device__ ~TreeCell() {}
+  __host__ __device__ TreeCell& TreeCell::operator=(const TreeCell& p) {
+    Range = p.Range;
+    Morton = p.Morton;
+    Level = p.Level;
+    Leaf = p.Leaf;
+    Parent = p.Parent;
+    Child = p.Child;
+    Particle = p.Particle;
+    Position = p.Position;
+    return *this;
+  }
 };
 
 class NBodyKernel
@@ -87,22 +82,37 @@ private:
   uint32_t NParticles;
 
 public:
-  float4 *RawData, *d_RawData;
+  float4 *RawDataPos, *d_RawDataPos;
+  float3 *RawDataVel, *d_RawDataVel;
   KerParticle *KerParticles, *d_KerParticles;
-  uint64_t *Encoded, *d_Encoded;
-  KerNode *KerTree, *KerLeaves, *d_KerTree, *d_KerLeaves;
-  KerOctreeNode *LinearOctree, *d_LinearOctree;
+  uint64_t *Encoded, *d_Encoded, *Counts, *d_Counts, *values, *d_values, *temp64, *d_temp64;
+  TreeCell **OctreeCells, **d_OctreeCells;
+  TreeCell *FinalOctreeCells, *d_FinalOctreeCells;
 
-  bool Initialized;
+  float3 CubeCornerA, CubeCornerB, Size, *d_Size;
+  bool InitializedCPU, InitializedGPU;
+  float deltaTime;
 
   uint64_t MaxSize;
-  uint32_t MaxDepth, *Counts, *d_Counts;
+  uint32_t MaxDepth, *Temp, *d_Temp, *TreeCellsSizes, totalSize, *ChildrenCounter, *d_ChildrenCounter;
 
-  NBodyKernel() : Initialized(false), MaxSize(1<<20), MaxDepth(21) {}
+  NBodyKernel() : InitializedCPU(false), InitializedGPU(false), MaxSize(1 << 20), MaxDepth(21), deltaTime(0) {}
   ~NBodyKernel();
 
-  void Initialize(uint32_t PartSize, float4* PartArray);
+  void CleanCPU();
+  void CleanGPU();
+  void InitializeCPU(uint32_t PartSize, float4 *p, float3 *v, float dt);
+  void InitializeGPU(uint32_t PartSize, float4 *p, float3 *v, float dt);
   void CopyEncodedToHost();
+
+  float4 * GetParticlePosition(uint32_t i) {
+    if (InitializedCPU) {
+      return &(KerParticles[i].Position);
+    } else if (InitializedGPU) {
+      return RawDataPos + i;
+    }
+    return NULL;
+  }
 
   void GPUBuildOctree();
   void CPUBuildOctree();

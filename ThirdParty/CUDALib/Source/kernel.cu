@@ -5,163 +5,77 @@
   #define __CUDACC__
 #endif
 
-//CUDA
+// CUDA
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <device_functions.h>
 
-//Thrust
+// Thrust
+#include <thrust/system_error.h>
+#include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
 #include <thrust/scan.h>
 #include <thrust/unique.h>
 #include <thrust/count.h>
+#include <thrust/extrema.h>
 
+// Constants
 #define THREADS_PER_BLOCK 256
-#define G_CONSTANT 1
+#define G_CONSTANT 0.0
 #define EPSILON 0.1
 
-static inline uint32_t CLZ1(uint32_t x);
-__host__ __device__ uint32_t __clz64(uint64_t x);
-__host__ __device__ uint32_t __tlz64(uint64_t x);
-__host__ __device__ uint64_t ReverseChar(char x);
-__host__ __device__ uint64_t Reverse(uint64_t x);
+// Debug
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
+{
+  if (code != cudaSuccess)
+  {
+    OutputDebugString(("GPUassert: " + std::string(cudaGetErrorString(code)) + " " + file + " " + std::to_string(line) + "\n").c_str());
+    if (abort) exit(code);
+  }
+}
 
+// UTIL
+
+__host__ __device__ uint64_t ReverseChar(uint64_t x);
+__host__ __device__ uint64_t Reverse(uint64_t x);
 __host__ __device__ uint64_t SplitBy3(uint64_t x);
 __host__ __device__ uint64_t MagicBits(uint64_t x, uint64_t y, uint64_t z);
 __host__ __device__ uint64_t KerEncode(float4 v);
 
-__global__ void ParticleAlloc(uint32_t N, float4 *Data, KerParticle *Particles, uint64_t *Encoded, KerNode *Leaves);
+// Host/Device Functions
 
-__host__ __device__ uint2 CalculateRange(uint32_t N, KerParticle* Particles, uint64_t *Encoded, uint32_t index);
-__host__ __device__ uint32_t FindSplit(uint32_t N, KerParticle* Particles, uint64_t *Encoded, uint32_t lp, uint32_t rp);
-__host__ __device__ void GenerateNode(uint32_t N, KerParticle* Particles, uint64_t *Encoded, KerNode* Tree, KerNode* Leafs, uint32_t index);
-__global__ void GenerateOctree(uint32_t N, KerParticle * Particles, uint64_t *Encoded, KerNode * Tree, KerNode * Leaves);
-
-__host__ __device__ void CountNodes(uint32_t Index, uint64_t * Encoded, KerNode * Tree, uint32_t * Counts);
-__global__ void GenerateOctreeNodes(uint32_t N, uint64_t * Encoded, KerNode * Tree, uint32_t * Counts);
-
-__host__ __device__ void InitializeOctree(KerOctreeNode * Octree);
-__global__ void LinkingOctreeNodes(uint32_t N, KerParticle * Particles, KerOctreeNode * Tree);
-
-__host__ __device__ void ComputeCM(KerParticle * Particles, KerNode * Tree, uint32_t Index);
-__global__ void CenterOfMassOctree(uint32_t N, KerParticle * Particles, KerNode * Tree);
-
+__host__ __device__ void MortonEncoding(uint32_t i, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 Size, float MaxSize);
+__host__ __device__ void ComputeNodeKeys(uint32_t i, uint64_t * Counts, uint64_t * Encoded, uint32_t k);
+__host__ __device__ void InitializeOctree(uint32_t N, uint32_t i, TreeCell * OctreeCell, KerParticle * Particles, uint64_t * Encoded, uint32_t * Temp, uint64_t * values, uint32_t CellSize, uint32_t TotalSize, uint32_t k);
+__host__ __device__ void LinkOctree(uint32_t N, uint32_t i, TreeCell * Octree, uint32_t * d_ChildrenCounter, uint64_t * Range, uint32_t dLevel, uint32_t TotalSize);
+__host__ __device__ float4 CenterOfMass(uint32_t i, TreeCell * Octree, KerParticle * Particles);
 __host__ __device__ float Distance(float4 &v1, float4 &v2);
 __host__ __device__ float3 Acceleration(float4 &v1, float4 &v2, float d);
-__host__ __device__ void ComputeAcceleration(KerParticle * Particle, KerNode * Node, float BoundingSize);
-__global__ void AccelerationOctree(uint32_t N, KerParticle * Particles, KerNode * Tree, float BoundingSize);
+__host__ __device__ void AddAcceleration(KerParticle * p, float4 &v, float d);
+__host__ __device__ void ForceOnParticle(uint32_t pIndex, KerParticle * Particles, TreeCell * Node, float Size);
+__host__ __device__ void IntegrateParticle(uint32_t Index, KerParticle * Particles, float dt);
 
-__global__ void UpdateData(uint32_t N, KerParticle * Particles, float4 * Data);
+// Kernels
 
-/***** KerNode *****/
+__global__ void KerBoundary(float3 * Size, KerParticle * ax, KerParticle * ay, KerParticle * az, KerParticle * bx, KerParticle * by, KerParticle * bz);
+__global__ void KerAllocateData(uint32_t N, float4 * DataPos, float3 * DataVel, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 Size, float MaxSize);
+__global__ void KerEncodeParticles(uint32_t N, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 * Size, float MaxSize);
+__global__ void KerComputeNodes(uint32_t N, uint64_t * Counts, uint64_t * Encoded, uint32_t k);
+__global__ void KerUniques(uint32_t nNodes, uint32_t nParticles, uint64_t * Counts, uint64_t * Freq, uint64_t * Values);
+__global__ void KerInitializeOctree(uint32_t N, TreeCell * Octree, KerParticle * Particles, uint64_t * Encoded, uint32_t * Temp, uint64_t * values, uint32_t CellSize, uint32_t TotalSize, uint32_t k);
+__global__ void KerCopyLinearOctree(uint32_t N, uint32_t dLevel, uint64_t * Offset, TreeCell ** Octree, TreeCell * LinearOctree);
+__global__ void KerLinkingOctree(uint32_t N, TreeCell * Octree, uint32_t * d_ChildrenCounter, uint64_t * Range, uint32_t dLevel, uint32_t TotalSize);
+__global__ void KerCenterOfMass(uint32_t N, TreeCell * Octree, KerParticle * Particles);
+__global__ void KerForces(uint32_t pIndex, uint32_t N, KerParticle * Particles, TreeCell * Octree, float3 * Size);
+__global__ void KerIntegration(uint32_t N, KerParticle * Particles, float dt);
+__global__ void KerUpdateData(uint32_t N, KerParticle * Particles, float4 * Data);
 
-__host__ __device__ uint32_t KerNode::GetCount(uint64_t * Encoded)
-{
-  uint32_t t = 0;
+/***** CUDA host/device Functions *****/
 
-  uint32_t deltaParent = __clz64(Encoded[Range.x] ^ Encoded[Range.y]);
-  uint32_t deltaChild;
-
-  if (LeftNode->Particle == NULL) {
-    //Length of left node.
-    deltaChild = __clz64(Encoded[LeftNode->Range.x] ^ Encoded[LeftNode->Range.y]);
-    if (deltaChild > deltaParent) { t += deltaChild / 3 - deltaParent / 3; }
-  } else {
-    deltaChild = __clz64(LeftNode->Particle->Morton);
-    if (deltaChild > deltaParent) { t += deltaChild / 3 - deltaParent / 3; }
-  }
-
-  if (RightNode->Particle == NULL) {
-    //Length of right node.
-    deltaChild = __clz64(Encoded[RightNode->Range.x] ^ Encoded[RightNode->Range.y]);
-    if (deltaChild > deltaParent) { t += deltaChild / 3 - deltaParent / 3; }
-  } else {
-    deltaChild = __clz64(RightNode->Particle->Morton);
-    if (deltaChild > deltaParent) { t += deltaChild / 3 - deltaParent / 3; }
-  }
-
-  return t;
-}
-
-/***** CUDA Kernel Functions *****/
-
-static inline uint32_t CLZ1(uint32_t x) {
-  static uint8_t const clz_lkup[] = {
-    32U, 31U, 30U, 30U, 29U, 29U, 29U, 29U,
-    28U, 28U, 28U, 28U, 28U, 28U, 28U, 28U,
-    27U, 27U, 27U, 27U, 27U, 27U, 27U, 27U,
-    27U, 27U, 27U, 27U, 27U, 27U, 27U, 27U,
-    26U, 26U, 26U, 26U, 26U, 26U, 26U, 26U,
-    26U, 26U, 26U, 26U, 26U, 26U, 26U, 26U,
-    26U, 26U, 26U, 26U, 26U, 26U, 26U, 26U,
-    26U, 26U, 26U, 26U, 26U, 26U, 26U, 26U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    25U, 25U, 25U, 25U, 25U, 25U, 25U, 25U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U,
-    24U, 24U, 24U, 24U, 24U, 24U, 24U, 24U
-  };
-  uint32_t n;
-  if (x >= (1U << 16)) {
-    if (x >= (1U << 24)) {
-      n = 24U;
-    } else {
-      n = 16U;
-    }
-  } else {
-    if (x >= (1U << 8)) {
-      n = 8U;
-    } else {
-      n = 0U;
-    }
-  }
-  return (uint32_t)clz_lkup[x >> n] - n;
-}
-
-__host__ __device__ uint32_t __clz64(uint64_t x)
-{
-  uint32_t t = 0;
-#if defined(__CUDA_ARCH__)
-  t += __clz(x >> 32);
-
-  if (t == 32) { t += __clz(x); }
-#else
-  t += CLZ1(x >> 32);
-  if (t == 32) { t += CLZ1(x); }
-#endif
-  return t;
-}
-
-__host__ __device__ uint32_t __tlz64(uint64_t x)
-{
-  for (uint32_t i = 0; i < 64; i++) {
-    if (x & (1i64 << i)) return i;
-  }
-  return 64;
-}
-
-__host__ __device__ uint64_t ReverseChar(char x)
+__host__ __device__ uint64_t ReverseChar(uint64_t x)
 {
   return (x * 0x0202020202ULL & 0x010884422010ULL) % 1023;
 }
@@ -200,163 +114,90 @@ __host__ __device__ uint64_t KerEncode(float4 v)
   return MagicBits((uint64_t)(v.x), (uint64_t)(v.y), (uint64_t)(v.z));
 }
 
-__global__ void ParticleAlloc(uint32_t N, float4 *Data, KerParticle *Particles, uint64_t *Encoded, KerNode *Leaves, uint32_t *Counts)
+__host__ __device__ void MortonEncoding(uint32_t i, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 Size, float MaxSize)
 {
-  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
-  if (i < N) {
-    Particles[i].Position = Data[i];
-    Leaves[i].Particle = Particles + i;
-    Particles[i].ParentNode = Leaves + i;
-    Encoded[i] = KerEncode(Particles[i].Position);
-  }
-  if (i + 1 < N) { Counts[i] = 0; }
+  float4 t = make_float4(0, 0, 0, 0);
+  t.x = Particles[i].Position.x / Size.x * MaxSize;
+  t.y = Particles[i].Position.y / Size.y * MaxSize;
+  t.z = Particles[i].Position.z / Size.z * MaxSize;
+  Encoded[i] = KerEncode(t);
+  Counts[i] = 0;
 }
 
-__host__ __device__ uint2 CalculateRange(uint32_t N, KerParticle* Particles, uint64_t *Encoded, uint32_t index)
+__host__ __device__ void ComputeNodeKeys(uint32_t i, uint64_t * Counts, uint64_t * Encoded, uint32_t k)
 {
-  if (index == 0) { return make_uint2(0, N-1); }
-  int dir;
-  uint32_t d_min, iind;
-  iind = index;
+  Counts[i] = Encoded[i] & Reverse((1i64 << 3 * k) - 1);
+}
 
-  uint64_t ml, mc, mr;
-  ml = Encoded[index - 1];
-  mc = Encoded[index];
-  mr = Encoded[index + 1];
+__host__ __device__ void InitializeOctree(uint32_t N, uint32_t i, TreeCell * OctreeCell, KerParticle * Particles, uint64_t * Encoded, uint32_t * Temp, uint64_t * values, uint32_t CellSize, uint32_t TotalSize, uint32_t k)
+{
+  OctreeCell[i].Range = make_uint2(Temp[i], i == CellSize - 1 ? N : Temp[i + 1]);
+  OctreeCell[i].Morton = Reverse(values[i]);
+  OctreeCell[i].Level = k;
 
-  if (ml == mc && mc == mr) {
-    for (; (index < N) && (Encoded[index] != Encoded[index + 1]); index++) {}
-    return make_uint2(iind, index);
+  if (OctreeCell[i].Range.x + 1 == OctreeCell[i].Range.y) {
+    OctreeCell[i].Leaf = true;
+    OctreeCell[i].Particle = Particles + Temp[i];
+    OctreeCell[i].Particle->Parent = TotalSize + i;
+  }
+  //CenterOfMass(i, OctreeCell, Particles);
+}
+
+__host__ __device__ void LinkOctree(uint32_t N, uint32_t i, TreeCell * Octree, uint32_t * ChildrenCounter, uint64_t * Range, uint32_t dLevel, uint32_t TotalSize)
+{
+  register uint64_t x0, x1, x2, x3;
+  register TreeCell node;
+  if (i == 0) {
+    Octree[0].Range = make_uint2(0, N);
   } else {
-    uint2 lr = make_uint2(__clz64(mc ^ ml), __clz64(mc ^ mr));
-    if (lr.x > lr.y) {
-      dir = -1;
-      d_min = lr.y;
-    } else {
-      dir = 1;
-      d_min = lr.x;
-    }
-  }
-  uint32_t l_max = 2;
-  int64_t testindex = index + l_max*dir;
-  while (testindex < N && (testindex >= 0 ? __clz64(mc ^ Encoded[testindex])>d_min : false)) {
-    l_max *= 2;
-    testindex = index + l_max*dir;
-  }
-
-  uint32_t l, t, splitPrefix; l = 0;
-  int64_t nt;
-  for (uint32_t div = 2; l_max / div >= 1; div *= 2) {
-    t = l_max / div;
-    nt = index + (l + t)*dir;
-    if (nt < N) {
-      splitPrefix = __clz64(mc ^ Encoded[nt]);
-      if (splitPrefix > d_min) { l += t; }
-    }
-  }
-
-  return dir > 0 ? make_uint2(index, index + l*dir) : make_uint2(index + l*dir, index);
-}
-
-__host__ __device__ uint32_t FindSplit(uint32_t N, KerParticle* Particles, uint64_t *Encoded, uint32_t lp, uint32_t rp)
-{
-  uint64_t lc, rc;
-  lc = Encoded[lp];
-  rc = Encoded[rp];
-
-  if (lc == rc) return lp;
-
-  uint64_t prefix = __clz64(lc ^ rc);
-  uint32_t split = lp;
-  int64_t step = rp - lp;
-  int64_t ns;
-  uint64_t sc, sp;
-  while (step > 1) {
-    step = (step + 1) >> 1;
-    ns = split + step;
-
-    if (ns < rp) {
-      sc = Encoded[ns];
-      sp = __clz64(lc ^ sc);
-      if (sp > prefix) { split = ns; }
-    }
-  }
-
-  return split;
-}
-
-__host__ __device__ void GenerateNode(uint32_t N, KerParticle* Particles, uint64_t *Encoded, KerNode* Tree, KerNode* Leaves, uint32_t index)
-{
-  uint2 r = CalculateRange(N, Particles, Encoded, index);
-  uint32_t split = FindSplit(N, Particles, Encoded, r.x, r.y);
-
-#if defined(__CUDA_ARCH__)
+    node = Octree[i];
+    x0 = Range[node.Level - 1];
+    x1 = Range[node.Level];
+    x2 = Range[node.Level + 1];
+    x3 = (node.Level + 2 >= dLevel ? TotalSize : Range[node.Level + 2]);
+    for (uint64_t j = x0; j < x1; j++) {
+      if (Octree[j].Leaf) continue;      
+      if ((node.Morton << 3) == Octree[j].Morton) {
+#if defined( __CUDA_ARCH__ )
+        //atomicAdd(ChildrenCounter + i, 1);
 #else
-  OutputDebugString(("Index: " + std::to_string(index) + ". " + std::to_string(split) + " - " + std::to_string(r.x) + ", " + std::to_string(r.y) + "\n").c_str());
+        ChildrenCounter[i]++;
 #endif
-
-  Tree[index].LeftNode = (split == r.x ? Leaves : Tree) + split;
-  Tree[index].RightNode = (split + 1 == r.y ? Leaves : Tree) + split + 1;
-  Tree[index].Range = r;
-
-  Tree[index].LeftNode->ParentNode = Tree + index;
-  Tree[index].RightNode->ParentNode = Tree + index;
-}
-
-__global__ void GenerateOctree(uint32_t N, KerParticle * Particles, uint64_t *Encoded, KerNode * Tree, KerNode * Leaves)
-{
-  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
-  if (i < N) { GenerateNode(N, Particles, Encoded, Tree, Leaves, i); }
-}
-
-__host__ __device__ void CountNodes(uint32_t Index, uint64_t * Encoded, KerNode * Tree, uint32_t * Counts)
-{
-  Counts[Index] += Tree[Index].GetCount(Encoded);
-}
-
-__global__ void GenerateOctreeNodes(uint32_t N, uint64_t * Encoded, KerNode * Tree, uint32_t * Counts)
-{
-  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
-  if (i + 1 < N) { CountNodes(i, Encoded, Tree, Counts); }
-}
-
-__host__ __device__ void InitializeOctree(uint32_t Index, KerOctreeNode * Octree, uint64_t * Encoded, uint32_t * Counts, KerNode * Tree)
-{
-#if defined(__CUDA_ARCH__)
-#else
-  OutputDebugString(("Index: " + std::to_string(__clz64(Encoded[Tree[Index].Range.x] ^ Encoded[Tree[Index].Range.y])) + "\n").c_str());
-#endif
-  uint32_t start = Index == 0 ? 0 : Counts[Index - 1];
-  for (uint32_t i = start; i < Counts[Index]; i++) {
-    Octree[i].RadixParent = Tree + i;
-    Octree[i].Morton = Encoded[Tree[Index].Range.x] & Reverse((1i64 << (__clz64(Encoded[Tree[Index].Range.x] ^ Encoded[Tree[Index].Range.y]) + 1)) - 1);
+        node.Parent = j;
+        break;
+      }
+    }
+    /*
+    if (!Octree[i].Leaf) {
+      for (uint32_t j = Range[Octree[i].Level + 1]; j < ; j++) {
+        if ((Octree[j].Morton << 3) == Octree[i].Morton) {
+          Octree[i].Child = j;
+          break;
+        }
+      }
+    }
+    */
   }
 }
 
-__global__ void LinkingOctreeNodes(uint32_t N, KerParticle * Particles, KerOctreeNode * Octree)
+__host__ __device__ float4 CenterOfMass(uint32_t i, TreeCell * Octree, KerParticle * Particles)
 {
-  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
-//  if (i < N) { InitializeOctree(i, Octree); }
-}
-
-__host__ __device__ void ComputeCM(KerParticle * Particles, KerNode * Tree, uint32_t Index)
-{
-  Tree[Index].CenterOfMass = make_float4(0, 0, 0, 0);
-  for (uint32_t i = Tree[Index].Range.x; i < Tree[Index].Range.y; i++) {
-    Tree[Index].CenterOfMass.x += Particles[i].Position.w * Particles[i].Position.x;
-    Tree[Index].CenterOfMass.y += Particles[i].Position.w * Particles[i].Position.y;
-    Tree[Index].CenterOfMass.z += Particles[i].Position.w * Particles[i].Position.z;
-    Tree[Index].CenterOfMass.w += Particles[i].Position.w;
+  register uint64_t x0, x1;
+  register TreeCell node = Octree[i];
+  register KerParticle p;
+  x0 = node.Range.x; x1 = node.Range.y;
+  node.Position = make_float4(0, 0, 0, 0);
+  for (uint32_t j = x0; j < x1; j++) {
+    p = Particles[j];
+    node.Position.x += p.Position.x * p.Position.w;
+    node.Position.y += p.Position.y * p.Position.w;
+    node.Position.z += p.Position.z * p.Position.w;
+    node.Position.w += p.Position.w;
   }
-  Tree[Index].CenterOfMass.x /= Tree[Index].CenterOfMass.w;
-  Tree[Index].CenterOfMass.y /= Tree[Index].CenterOfMass.w;
-  Tree[Index].CenterOfMass.z /= Tree[Index].CenterOfMass.w;
-}
-
-__global__ void CenterOfMassOctree(uint32_t N, KerParticle * Particles, KerNode * Tree)
-{
-  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
-  if (i + 1 < N) { ComputeCM(Particles, Tree, i); }
+  node.Position.x /= node.Position.w;
+  node.Position.y /= node.Position.w;
+  node.Position.z /= node.Position.w;
+  return node.Position;
 }
 
 __host__ __device__ float Distance(float4 &v1, float4 &v2)
@@ -367,38 +208,140 @@ __host__ __device__ float Distance(float4 &v1, float4 &v2)
 // acceleration of v1 produced by v2, v1 -> v2.
 __host__ __device__ float3 Acceleration(float4 &v1, float4 &v2, float d)
 {
-  float t = G_CONSTANT * v2.w / pow(d+EPSILON, 3);
+  float t = G_CONSTANT * v2.w / pow(d + EPSILON, 3);
   return make_float3(t*(v2.x - v1.x), t*(v2.y - v1.y), t*(v2.z - v1.z));
 }
 
-__host__ __device__ void ComputeAcceleration(KerParticle * Particle, KerNode * Node, float BoundingSize)
+__host__ __device__ void AddAcceleration(KerParticle * p, float4 &v, float d)
 {
-  float d = 0.0;
-  if (Node->Particle == NULL) {
-    d = Distance(Node->LeftNode->CenterOfMass, Particle->Position);
-    if (BoundingSize / d < 1) {
-      float3 a = Acceleration(Particle->Position, Node->LeftNode->CenterOfMass, d);
-      Particle->Acceleration.x += a.x;
-      Particle->Acceleration.y += a.y;
-      Particle->Acceleration.z += a.z;
-    } else { ComputeAcceleration(Particle, Node->LeftNode, BoundingSize / 2); }
+  float3 a = Acceleration(p->Position, v, d);
+  p->Acceleration.x += a.x;
+  p->Acceleration.y += a.y;
+  p->Acceleration.z += a.z;
+}
 
-    d = Distance(Node->RightNode->CenterOfMass, Particle->Position);
-    if (BoundingSize / d < 1) {
-      float3 a = Acceleration(Particle->Position, Node->RightNode->CenterOfMass, d);
-      Particle->Acceleration.x += a.x;
-      Particle->Acceleration.y += a.y;
-      Particle->Acceleration.z += a.z;
-    } else { ComputeAcceleration(Particle, Node->RightNode, BoundingSize / 2); }
-  } else {
-    float3 a = Acceleration(Particle->Position, Node->RightNode->CenterOfMass, Distance(Particle->Position, Node->Particle->Position));
-    Particle->Acceleration.x += a.x;
-    Particle->Acceleration.y += a.y;
-    Particle->Acceleration.z += a.z;
+__host__ __device__ void ForceOnParticle(uint32_t pIndex, KerParticle * Particles, TreeCell * Node, float Size)
+{
+  register float d = Distance(Particles[pIndex].Position, Node->Position);
+  if (Node->Leaf) {
+    AddAcceleration(Particles + pIndex, Node->Position, d);
+  } else if (Size < d * (1 << Node->Level)) {
+    AddAcceleration(Particles + pIndex, Node->Position, d);
   }
 }
 
-__global__ void UpdateData(uint32_t N, KerParticle * Particles, float4 * Data)
+__host__ __device__ void IntegrateParticle(uint32_t Index, KerParticle * Particles, float dt)
+{
+  Particles[Index].Velocity.x += Particles[Index].Acceleration.x * dt;
+  Particles[Index].Velocity.y += Particles[Index].Acceleration.y * dt;
+  Particles[Index].Velocity.z += Particles[Index].Acceleration.z * dt;
+  Particles[Index].Position.x += Particles[Index].Velocity.x * dt;
+  Particles[Index].Position.y += Particles[Index].Velocity.y * dt;
+  Particles[Index].Position.z += Particles[Index].Velocity.z * dt;
+}
+
+/***** CUDA Kernels *****/
+
+__global__ void KerBoundary(uint32_t N, KerParticle * Particles, float3 * Size)
+{
+  register float3 a, b;
+  register uint32_t i = threadIdx.x;
+  if (i == 0) {
+    a.x = thrust::max_element(thrust::device, Particles, Particles + N, CompareParticleX())->Position.x;
+    b.x = thrust::min_element(thrust::device, Particles, Particles + N, CompareParticleX())->Position.x;
+    Size->x = a.x - b.x;
+  } else if (i == 1) {
+    a.y = thrust::max_element(thrust::device, Particles, Particles + N, CompareParticleY())->Position.y;
+    b.y = thrust::min_element(thrust::device, Particles, Particles + N, CompareParticleY())->Position.y;
+    Size->y = a.y - b.y;
+  } else {
+    a.z = thrust::max_element(thrust::device, Particles, Particles + N, CompareParticleZ())->Position.z;
+    b.z = thrust::min_element(thrust::device, Particles, Particles + N, CompareParticleZ())->Position.z;
+    Size->z = a.z - b.z;
+  }
+}
+
+__global__ void KerAllocateData(uint32_t N, float4 * DataPos, float3 * DataVel, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 * Size, float MaxSize)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) {
+    Particles[i].Position.x = DataPos[i].x;
+    Particles[i].Position.y = DataPos[i].y;
+    Particles[i].Position.z = DataPos[i].z;
+    Particles[i].Position.w = DataPos[i].w;
+    Particles[i].Velocity.x = DataVel[i].x;
+    Particles[i].Velocity.y = DataVel[i].y;
+    Particles[i].Velocity.z = DataVel[i].z;
+    MortonEncoding(i, Particles, Encoded, Counts, *Size, MaxSize);
+  }
+}
+
+__global__ void KerEncodeParticles(uint32_t N, KerParticle * Particles, uint64_t * Encoded, uint64_t * Counts, float3 * Size, float MaxSize)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { MortonEncoding(i, Particles, Encoded, Counts, *Size, MaxSize); }
+}
+
+__global__ void KerComputeNodes(uint32_t N, uint64_t * Counts, uint64_t * Encoded, uint32_t k)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { ComputeNodeKeys(i, Counts, Encoded, k); }
+}
+
+__global__ void KerUniques(uint32_t nNodes, uint32_t nParticles, uint64_t * Counts, uint64_t * Freq, uint64_t * Values)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < nNodes) Freq[i] = thrust::count(thrust::device, Counts, Counts + nParticles, Values[i]);
+}
+
+__global__ void KerInitializeOctree(uint32_t N, TreeCell * Octree, KerParticle * Particles, uint64_t * Encoded, uint32_t * Temp, uint64_t * values, uint32_t CellSize, uint32_t TotalSize, uint32_t k)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { 
+    InitializeOctree(N, i, Octree, Particles, Encoded, Temp, values, CellSize, TotalSize, k);
+  }
+}
+
+__global__ void KerCopyLinearOctree(uint32_t N, uint32_t dLevel, uint64_t * Offset, TreeCell ** Octree, TreeCell * LinearOctree)
+{
+  register uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  register uint32_t osInd;
+  if (i < N) {
+    for (uint32_t j = 0; j < dLevel; j++) {
+      if (Offset[j] > i) {
+        osInd = j - 1;
+        break;
+      }
+    }
+    if (osInd > 0) LinearOctree[i] = Octree[osInd][Offset[osInd] + i];
+  }
+}
+
+__global__ void KerLinkingOctree(uint32_t N, TreeCell * Octree, uint32_t * ChildrenCounter, uint64_t * Offset, uint32_t dLevel, uint32_t TotalSize)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { LinkOctree(N, i, Octree, ChildrenCounter, Offset, dLevel, TotalSize); }
+}
+
+__global__ void KerCenterOfMass(uint32_t N, TreeCell * Octree, KerParticle * Particles)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { Octree[i].Position = CenterOfMass(i, Octree, Particles); }
+}
+
+__global__ void KerForces(uint32_t pIndex, uint32_t N, KerParticle * Particles, TreeCell * Octree, float3 * Size)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { ForceOnParticle(pIndex, Particles, Octree + i, max(Size->x, max(Size->y, Size->z))); }
+}
+
+__global__ void KerIntegration(uint32_t N, KerParticle * Particles, float dt)
+{
+  uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
+  if (i < N) { IntegrateParticle(i, Particles, dt); }
+}
+
+__global__ void KerUpdateData(uint32_t N, KerParticle * Particles, float4 * Data)
 {
   uint32_t i = blockIdx.x*blockDim.x + threadIdx.x;
   if (i < N) { Data[i] = Particles[i].Position; }
@@ -406,179 +349,380 @@ __global__ void UpdateData(uint32_t N, KerParticle * Particles, float4 * Data)
 
 NBodyKernel::~NBodyKernel()
 {
-  if (Initialized) {
-    cudaFree(d_RawData);
-    cudaFree(d_KerParticles);
-    cudaFree(d_Encoded);
-    cudaFree(d_KerTree);
-    cudaFree(d_KerLeaves);
-    cudaFree(d_Counts);
-    delete[] RawData;
+  CleanCPU();
+  CleanGPU();
+}
+
+void NBodyKernel::CleanCPU()
+{
+  if (InitializedCPU) {
+    delete[] OctreeCells;
+    delete[] TreeCellsSizes;
     delete[] KerParticles;
-    delete[] KerTree;
-    delete[] KerLeaves;
     delete[] Counts;
     delete[] Encoded;
+    delete[] Temp;
+    delete[] values;
+    delete[] temp64;
   }
 }
 
-void NBodyKernel::Initialize(uint32_t PartSize, float4* PartArray)
+void NBodyKernel::CleanGPU()
 {
-  if (Initialized && (PartSize != NParticles)) {
-    cudaFree(d_RawData);
+  if (InitializedGPU) {
+    delete[] TreeCellsSizes;
+    delete[] OctreeCells;
+    cudaFree(d_temp64);
+    cudaFree(d_Temp);
+    cudaFree(d_RawDataPos);
+    cudaFree(d_RawDataVel);
     cudaFree(d_KerParticles);
     cudaFree(d_Encoded);
-    cudaFree(d_KerTree);
-    cudaFree(d_KerLeaves);
     cudaFree(d_Counts);
-    delete[] RawData;
+    cudaFree(d_values);
+    cudaFree(d_Size);
+  }
+}
+
+void NBodyKernel::InitializeCPU(uint32_t PartSize, float4* p, float3* v, float dt)
+{
+  if (InitializedGPU) return;
+  if (!InitializedCPU) {
+    OctreeCells = new TreeCell*[MaxDepth];
+    TreeCellsSizes = new uint32_t[MaxDepth];
+    TreeCellsSizes[0] = 1;
+  }
+
+  if (InitializedCPU && (PartSize != NParticles)) {
     delete[] KerParticles;
-    delete[] KerTree;
-    delete[] KerLeaves;
     delete[] Counts;
     delete[] Encoded;
+    delete[] Temp;
+    delete[] values;
+    delete[] temp64;
   }
 
-  if (!Initialized || (PartSize != NParticles)) {
+  if (!InitializedCPU || (PartSize != NParticles)) {
     NParticles = PartSize;
     KerParticles = new KerParticle[NParticles];
-    RawData = new float4[NParticles];
-    KerTree = new KerNode[NParticles - 1];
-    KerLeaves = new KerNode[NParticles];
-    Counts = new uint32_t[NParticles];
+    Counts = new uint64_t[NParticles];
     Encoded = new uint64_t[NParticles];
-
-    cudaMalloc(&d_RawData, sizeof(float4)*NParticles);
-    cudaMalloc(&d_KerParticles, sizeof(KerParticle)*NParticles);
-    cudaMalloc(&d_Encoded, sizeof(uint64_t)*NParticles);
-    cudaMalloc(&d_KerLeaves, sizeof(KerNode)*NParticles);
-    cudaMalloc(&d_KerTree, sizeof(KerNode)*(NParticles - 1));
-    cudaMalloc(&d_Counts, sizeof(uint32_t)*(NParticles));
+    Temp = new uint32_t[NParticles];
+    values = new uint64_t[NParticles];
+    temp64 = new uint64_t[NParticles];
   }
 
-  for (uint32_t i = 0; i < NParticles; i++) { RawData[i] = PartArray[i]; }
-  //cudaMemcpy(d_RawData, PartArray, sizeof(float4)*NParticles, cudaMemcpyHostToDevice);
+  CubeCornerA = make_float3(0, 0, 0);
+  CubeCornerB = make_float3(0, 0, 0);
+  deltaTime = dt;
+  for (uint32_t i = 0; i < NParticles; i++) {
+    KerParticles[i].Position = p[i];
+    KerParticles[i].Velocity = v[i];
+    KerParticles[i].Acceleration = make_float3(0, 0, 0);
+  }
 
-  //ParticleAlloc<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_RawData, d_KerParticles, d_Encoded, d_KerLeaves, d_Counts);
-  Initialized = true;
+  InitializedCPU = true;
+}
+
+void NBodyKernel::InitializeGPU(uint32_t PartSize, float4* p, float3* v, float dt)
+{
+  if (InitializedCPU) return;
+  if (!InitializedGPU) {
+    cudaMalloc(&d_Size, sizeof(float3));
+    TreeCellsSizes = new uint32_t[MaxDepth];
+    OctreeCells = new TreeCell*[MaxDepth];
+  }
+
+  if (InitializedGPU && (PartSize != NParticles)) {
+    delete[] RawDataPos;
+    cudaFree(d_RawDataPos);
+    cudaFree(d_RawDataVel);
+    cudaFree(d_KerParticles);
+    cudaFree(d_Encoded);
+    cudaFree(d_Counts);
+    cudaFree(d_values);
+    cudaFree(d_temp64);
+    cudaFree(d_Temp);
+  }
+
+  if (!InitializedGPU || (PartSize != NParticles)) {
+    NParticles = PartSize;
+    RawDataPos = new float4[NParticles];
+
+    cudaMalloc(&d_RawDataPos, sizeof(float4)*NParticles);
+    cudaMalloc(&d_RawDataVel, sizeof(float3)*NParticles);
+    cudaMalloc(&d_KerParticles, sizeof(KerParticle)*NParticles);
+    cudaMalloc(&d_Encoded, sizeof(uint64_t)*NParticles);
+    cudaMalloc(&d_Counts, sizeof(uint64_t)*NParticles);
+    cudaMalloc(&d_values, sizeof(uint64_t)*NParticles);
+    cudaMalloc(&d_temp64, sizeof(uint64_t)*NParticles);
+    cudaMalloc(&d_Temp, sizeof(uint32_t)*NParticles);
+  }
+
+  CubeCornerA = make_float3(0, 0, 0);
+  CubeCornerB = make_float3(0, 0, 0);
+  deltaTime = dt;
+
+  cudaMemcpy(d_RawDataPos, p, sizeof(float4)*NParticles, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_RawDataVel, v, sizeof(float3)*NParticles, cudaMemcpyHostToDevice);
+
+  KerAllocateData<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_RawDataPos, d_RawDataVel, d_KerParticles, d_Encoded, d_Counts, d_Size, MaxSize);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  InitializedGPU = true;
 }
 
 void NBodyKernel::CopyEncodedToHost()
 {
-  if (!Initialized) return;
-  UpdateData<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, d_RawData);
-  cudaMemcpy(RawData, d_RawData, sizeof(float4)*NParticles, cudaMemcpyDeviceToHost);
+  if (!InitializedGPU) return;
+  KerUpdateData<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, d_RawDataPos);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaMemcpy(RawDataPos, d_RawDataPos, sizeof(float4)*NParticles, cudaMemcpyDeviceToHost));
 }
 
 void NBodyKernel::GPUBuildOctree()
 {
-  if (!Initialized) return;
-  thrust::device_ptr<KerParticle> p(d_KerParticles);
-  thrust::device_ptr<uint64_t> e(d_Encoded);
-  thrust::device_ptr<uint32_t> c(d_Counts);
+  if (!InitializedGPU) return;
+  thrust::device_ptr<KerParticle> dp_Particles(d_KerParticles);
+  thrust::device_ptr<uint64_t> dp_Encoded(d_Encoded);
+  thrust::device_ptr<uint64_t> dp_Counts(d_Counts);
+  thrust::device_ptr<uint64_t> dp_values(d_values);
+  thrust::device_ptr<uint64_t> dp_temp64(d_temp64);
+  thrust::device_ptr<uint32_t> dp_Temp(d_Temp);
+  
+  /////////////////////////////
+  // BOUNDING BOX
+  /////////////////////////////
 
-  thrust::sort_by_key(e, e + NParticles, p);
-  GenerateOctree<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, d_Encoded, d_KerTree, d_KerLeaves);
-  GenerateOctreeNodes<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_Encoded, d_KerTree, d_Counts);
+  KerBoundary<<<1, 3>>>(NParticles, d_KerParticles, d_Size);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
 
-  thrust::inclusive_scan(c, c + NParticles - 1, c);
+  /////////////////////////////
+  // MORTON ENCODING AND SORT
+  /////////////////////////////
 
-  uint32_t octreeSize;
-  cudaMemcpy(&octreeSize, d_Counts + NParticles - 2, sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  KerEncodeParticles<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, d_Encoded, d_Counts, d_Size, MaxSize);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  thrust::sort_by_key(dp_Encoded, dp_Encoded + NParticles, dp_Particles);
 
-  if (d_LinearOctree == NULL) { cudaMalloc(&d_LinearOctree, sizeof(KerOctreeNode)*octreeSize); }
+  thrust::fill(TreeCellsSizes + 1, TreeCellsSizes + MaxDepth, 0);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  /////////////////////////////
+  // OCTREE BUILDING
+  /////////////////////////////
 
-  cudaMemcpy(Counts, d_KerTree, sizeof(KerNode)*(NParticles - 1), cudaMemcpyDeviceToHost);
+  uint32_t CellSize = 0, dLevel = 1;
+  totalSize = 1;
+  for (uint32_t k = 1; k < MaxDepth && CellSize < NParticles; k++) {
+    
+    KerComputeNodes<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_Counts, d_Encoded, k);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    dLevel++;
+    CellSize = thrust::unique_copy(dp_Counts, dp_Counts + NParticles, dp_values) - dp_values;
+    TreeCellsSizes[k] = CellSize;
+    if (CellSize < NParticles) {
+      KerUniques<<<(CellSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(CellSize, NParticles, d_Counts, d_temp64, d_values);
+    } else {
+      thrust::fill(dp_temp64, dp_temp64 + NParticles, 1);
+    }
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    thrust::exclusive_scan(dp_temp64, dp_temp64 + CellSize, dp_Temp);
+    //OutputDebugString(("Total: " + std::to_string(k) + "\n").c_str());
 
-  //CenterOfMassOctree<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, d_KerTree);
+    cudaMalloc(OctreeCells + k, sizeof(TreeCell)*CellSize);
+
+    KerInitializeOctree<<<(CellSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(CellSize, OctreeCells[k], d_KerParticles, d_Encoded, d_Temp, d_values, CellSize, totalSize, k);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    totalSize += CellSize;
+  }
+  /////////////////////////////
+  // OCTREE LINKING
+  /////////////////////////////
+
+  cudaMalloc(&d_FinalOctreeCells, sizeof(TreeCell)*totalSize);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  uint64_t *Offset = new uint64_t[dLevel];
+  thrust::exclusive_scan(TreeCellsSizes, TreeCellsSizes + dLevel, Offset);
+
+  uint64_t *d_Offset;
+  cudaMalloc(&d_Offset, sizeof(uint64_t)*dLevel);
+  cudaMemcpy(d_Offset, Offset, sizeof(uint64_t)*dLevel, cudaMemcpyHostToDevice);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+
+  cudaMalloc(&d_OctreeCells, sizeof(TreeCell*)*dLevel);
+  cudaMemcpy(d_OctreeCells, OctreeCells, sizeof(TreeCell*)*dLevel, cudaMemcpyHostToDevice);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+
+  cudaMalloc(&d_ChildrenCounter, sizeof(uint32_t)*totalSize);
+  thrust::device_ptr<uint32_t> dp_ChildrenCounter(d_ChildrenCounter);
+  thrust::fill(dp_ChildrenCounter, dp_ChildrenCounter + totalSize, 0);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+
+  KerCopyLinearOctree<<<(totalSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(totalSize, dLevel, d_Offset, d_OctreeCells, d_FinalOctreeCells);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  cudaFree(d_OctreeCells);
+  for (uint32_t i = 1; i < dLevel; i++) { cudaFree(OctreeCells[i]); }
+
+  KerLinkingOctree<<<(totalSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles,  d_FinalOctreeCells, d_ChildrenCounter, d_Offset, dLevel, totalSize);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  cudaFree(d_Offset);
+  
+  /////////////////////////////
+  // CoM CALCULATION
+  /////////////////////////////
+
+  KerCenterOfMass<<<(totalSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(totalSize, d_FinalOctreeCells, d_KerParticles);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+
+
+  /////////////////////////////
+  // FORCE CALCULATION
+  /////////////////////////////
+
+  for (uint32_t i = 0; i < NParticles; i++) {
+    KerForces<<<(totalSize + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(i, totalSize, d_KerParticles, d_FinalOctreeCells, d_Size);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+  }
+
+  /////////////////////////////
+  // INTEGRATE NEW POSITIONS
+  /////////////////////////////
+
+  KerIntegration<<<(NParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(NParticles, d_KerParticles, deltaTime);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
 }
 
 void NBodyKernel::CPUBuildOctree()
 {
-  if (!Initialized) return;
+  if (!InitializedCPU) return;
+  /////////////////////////////
+  // BOUNDING BOX
+  /////////////////////////////
+  
+  CubeCornerA.x = thrust::max_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.x < b.Position.x; })->Position.x;
+  CubeCornerA.y = thrust::max_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.y < b.Position.y; })->Position.y;
+  CubeCornerA.z = thrust::max_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.z < b.Position.z; })->Position.z;
+  CubeCornerB.x = thrust::min_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.x < b.Position.x; })->Position.x;
+  CubeCornerB.y = thrust::min_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.y < b.Position.y; })->Position.y;
+  CubeCornerB.z = thrust::min_element(KerParticles, KerParticles + NParticles, [](const KerParticle &a, const KerParticle &b) -> bool { return a.Position.z < b.Position.z; })->Position.z;
+
+  Size = make_float3(CubeCornerA.x - CubeCornerB.x, CubeCornerA.y - CubeCornerB.y, CubeCornerA.z - CubeCornerB.z);
+  //OutputDebugString(("\n\nSize: " + std::to_string(Size.x) + ", " + std::to_string(Size.y) + ", " + std::to_string(Size.z) + ", " + "\n").c_str());
+
+  /////////////////////////////
+  // MORTON ENCODING AND SORT
+  /////////////////////////////
+
   for (uint32_t i = 0; i < NParticles; i++) {
-    KerParticles[i].Position = RawData[i];
-    KerLeaves[i].Particle = KerParticles + i;
-    KerParticles[i].ParentNode = KerLeaves + i;
-    Encoded[i] = KerEncode(KerParticles[i].Position);
-    /*if (i + 1 < NParticles)*/ Counts[i] = 0;
+    MortonEncoding(i, KerParticles, Encoded, Counts, Size, MaxSize);
   }
 
   thrust::sort_by_key(Encoded, Encoded + NParticles, KerParticles);
-
+  //assert(thrust::unique(Encoded, Encoded + NParticles) - Encoded == NParticles);
+  /*
   char msg[65]; msg[64] = '\0';
   for (uint32_t i = 0; i < NParticles; i++) {
     for (int j = 0; j < 64; j++) { msg[j] = (Encoded[i] & 1i64 << j) ? '1' : '0'; }
     OutputDebugString(("Index: " + std::to_string(i) + ", \t" + msg + "\n").c_str());
   }
+  */
+  thrust::fill(TreeCellsSizes, TreeCellsSizes + 1, 1);
+  thrust::fill(TreeCellsSizes + 1, TreeCellsSizes + MaxDepth, 0);
 
-  TreeCell ** TC = new TreeCell*[21];
-  uint32_t * values = new uint32_t[NParticles];
-  uint32_t * temp, *temp2;
-  temp2 = new uint32_t[NParticles];
-  uint32_t t2, TCcount = 0;
-  bool finish = false;
-  for (uint32_t k = 1; k < 21; k++, TCcount++) {
-    finish = true;
-    for (uint32_t i = 0; i < NParticles; i++) {
-      for (int j = 0; j < 64; j++) { msg[j] = (Encoded[i] & 1i64 << j) ? '1' : '0'; }
-      OutputDebugString(("Index: " + std::to_string(i) + ", \t" + msg + "\n").c_str());
-      if ((Encoded[i] & 1i64) == 0) { finish = false; }
-      Counts[i] = ((Encoded[i] & Reverse((1i64 << (3 * k)) - 1)) >> (64 - 3 * k));
-    }
-    if (finish) break;
+  /////////////////////////////
+  // OCTREE BUILDING
+  /////////////////////////////
 
-    for (uint32_t i = 0; i < NParticles; i++) { OutputDebugString((std::to_string(Counts[i]) + ", ").c_str()); }
-    OutputDebugString("\n\n");
-    temp = thrust::unique_copy(Counts, Counts + NParticles, values);
-    t2 = temp - values;
-    temp = new uint32_t[t2];
-    for (uint32_t i = 0; i < t2; i++) { temp[i] = thrust::count(Counts, Counts + NParticles, values[i]); }
-    thrust::exclusive_scan(temp, temp + t2, temp2);
-    for (uint32_t i = 0; i < t2; i++) { OutputDebugString((std::to_string(temp2[i]) + ", ").c_str()); }
-    OutputDebugString("\n\n");
-    TC[k] = new TreeCell[t2];
+  uint32_t t2 = 0, c = 1;
+  totalSize = 1;
+  for (uint32_t k = 1; k < MaxDepth && t2 < NParticles; k++) {
+
+    for (uint32_t i = 0; i < NParticles; i++) { ComputeNodeKeys(i, Counts, Encoded, k); }
+
+    c++;
+    t2 = thrust::unique_copy(Counts, Counts + NParticles, values) - values;
+    TreeCellsSizes[k] = t2;
+    if (t2 < NParticles) {
+      for (uint32_t i = 0; i < t2; i++) { temp64[i] = thrust::count(Counts, Counts + NParticles, values[i]); }
+    } else { thrust::fill(temp64, temp64 + NParticles, 1); }
+    thrust::exclusive_scan(temp64, temp64 + t2, Temp);
+
+    OctreeCells[k] = new TreeCell[t2];
+
+    //OutputDebugString(("Total: " + std::to_string(t2) + "\n").c_str());
     for (uint32_t i = 0; i < t2; i++) {
-      TC[k][i].Range = make_uint2(temp2[i], i == t2 - 1 ? t2 : temp2[i + 1]);
-      if (TC[k][i].Range.x + 1 == TC[k][i].Range.y) {
-        Encoded[TC[k][i].Range.x] |= 1i64;
-      }
-      OutputDebugString(("[" + std::to_string(TC[k][i].Range.x) + ", " + std::to_string(TC[k][i].Range.y) + "]\n").c_str());
+      InitializeOctree(NParticles, i, OctreeCells[k], KerParticles, Encoded, Temp, values, t2, totalSize, k);
     }
-    //OutputDebugString("\n\n");
-    delete[] temp;
-    //delete[] temp2;
-  }
-  if (TCcount != 20) delete[] temp;
-  for (uint32_t i = 0; i < TCcount; i++) {
-    delete[] TC[i];
+    totalSize += t2;
   }
 
+  /////////////////////////////
+  // OCTREE LINKING
+  /////////////////////////////
   /*
-  for (uint32_t i = 0; i < NParticles; i++) { KerParticles[i].Morton = Encoded[i]; }
-  for (uint32_t i = 0; i < NParticles; i++) { GenerateNode(NParticles, KerParticles, Encoded, KerTree, KerLeaves, i); }
-  for (uint32_t i = 0; i + 1 < NParticles; i++) { CountNodes(i, Encoded, KerTree, Counts); }
-  */
-  /*OutputDebugString("\n\n");
-  for (uint32_t i = 0; i + 1 < NParticles; i++) { OutputDebugString((std::to_string(Counts[i]) + ", ").c_str()); }
-  OutputDebugString("\n\n");*/
-  //thrust::inclusive_scan(Counts, Counts + NParticles - 1, Counts);
-  //uint32_t Size = thrust::reduce(Counts, Counts + NParticles - 1) + 1;
-  //thrust::inclusive_scan(Counts, Counts + NParticles - 1, Counts);
-  /*for (uint32_t i = 0; i + 1 < NParticles; i++) { OutputDebugString((std::to_string(Counts[i]) + ", ").c_str()); }
-  OutputDebugString("\n\n");*/
-  /*
-  LinearOctree = new KerOctreeNode[Size];
-  //thrust::inclusive_scan(Counts, Counts + NParticles - 1, Counts);
-  OutputDebugString((std::to_string(Size) + " \n").c_str());
-  for (uint32_t i = 0; i + 1 < NParticles; i++) { OutputDebugString((std::to_string(Counts[i]) + ", ").c_str()); }
-  OutputDebugString("\n\n");
-  for (uint32_t i = 0; i + 1 < NParticles; i++) { InitializeOctree(i, LinearOctree, Encoded, Counts, KerTree); }
-  for (uint32_t i = 0; i < Size; i++) {
-    for (int j = 0; j < 64; j++) { msg[j] = (LinearOctree[i].Morton & 1i64 << j) ? '1' : '0'; }
-    OutputDebugString(("Index: " + std::to_string(i) + ", \t" + msg + "\n").c_str());
+  FinalOctreeCells = new TreeCell[totalSize];
+  ChildrenCounter = new uint32_t[totalSize];
+  uint64_t *temp2 = new uint64_t[c];
+  thrust::exclusive_scan(TreeCellsSizes, TreeCellsSizes + c, temp2);
+  //OutputDebugString(("Octree nodes: " + std::to_string(totalSize) + "\n").c_str());
+  
+  for (uint32_t i = 0; i < c; i++) {
+    thrust::copy(OctreeCells[i], OctreeCells[i] + TreeCellsSizes[i], FinalOctreeCells + temp2[i]);
+    //delete[] OctreeCells[i];
   }
 
-  OutputDebugString("\n\n");
+  for (uint32_t i = 0; i < totalSize; i++) {
+    LinkOctree(NParticles, i, FinalOctreeCells, ChildrenCounter, temp2, c, totalSize);
+  }
   */
+  /*
+  for (uint32_t i = 0; i < totalSize; i++) {
+    OutputDebugString(("Index: " + std::to_string(i) + " childs: " + std::to_string(FinalOctreeCells[i].ChildCounter) + "\n").c_str());
+    for (uint32_t k = 0; k < FinalOctreeCells[i].ChildCounter; k++) {
+      for (int j = 0; j < 64; j++) { msg[j] = (FinalOctreeCells[FinalOctreeCells[i].Child + k].Morton & 1i64 << j) ? '1' : '0'; }
+      OutputDebugString(("\t\t" + std::string(msg) + "\n").c_str());
+    }
+  }
+  */
+  /////////////////////////////
+  // CoM CALCULATION
+  /////////////////////////////
+
+  //for (uint32_t i = 0; i < totalSize; i++) {
+  //  CenterOfMass(i, FinalOctreeCells, KerParticles);
+  //}
+
+  /////////////////////////////
+  // FORCE CALCULATION
+  /////////////////////////////
+  
+  for (uint32_t i = 0; i < NParticles; i++) {
+    for (uint32_t j = 0; j < totalSize; j++) {
+      ForceOnParticle(i, KerParticles, FinalOctreeCells + j, max(Size.x, max(Size.y, Size.z)));
+    }
+  }
+
+  /////////////////////////////
+  // INTEGRATE NEW POSITIONS
+  /////////////////////////////
+
+  for (uint32_t i = 0; i < NParticles; i++) {
+    IntegrateParticle(i, KerParticles, deltaTime);
+  }
+
 }
