@@ -1,60 +1,58 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
+
 <Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemGroup>
-    <None Include="..\..\NBody.uproject" />
-    <Filter Include="Source">
-      <UniqueIdentifier>{E8FA92A1-1F89-4466-A3A1-1B0C2029440F}</UniqueIdentifier>
-    </Filter>
-    <None Include="..\..\Source\NBody.Target.cs">
-      <Filter>Source</Filter>
-    </None>
-    <None Include="..\..\Source\NBodyEditor.Target.cs">
-      <Filter>Source</Filter>
-    </None>
-    <Filter Include="Config">
-      <UniqueIdentifier>{90FDF13C-0BD1-4378-AF1A-2115622CA7B0}</UniqueIdentifier>
-    </Filter>
-    <None Include="..\..\Config\DefaultEditor.ini">
-      <Filter>Config</Filter>
-    </None>
-    <None Include="..\..\Config\DefaultEngine.ini">
-      <Filter>Config</Filter>
-    </None>
-    <None Include="..\..\Config\DefaultGame.ini">
-      <Filter>Config</Filter>
-    </None>
-    <Filter Include="Source\NBody">
-      <UniqueIdentifier>{51D3B95E-0450-42D0-BF91-222A210DE0BA}</UniqueIdentifier>
-    </Filter>
-    <None Include="..\..\Source\NBody\NBody.Build.cs">
-      <Filter>Source\NBody</Filter>
-    </None>
-    <ClCompile Include="..\..\Source\NBody\NBody.cpp">
-      <Filter>Source\NBody</Filter>
-    </ClCompile>
-    <ClInclude Include="..\..\Source\NBody\NBody.h">
-      <Filter>Source\NBody</Filter>
-    </ClInclude>
-    <ClCompile Include="..\..\Source\NBody\NBodyGameMode.cpp">
-      <Filter>Source\NBody</Filter>
-    </ClCompile>
-    <ClInclude Include="..\..\Source\NBody\NBodyGameMode.h">
-      <Filter>Source\NBody</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Source\NBody\UnrealEngine">
-      <UniqueIdentifier>{5caf6e7b-28c6-4dc4-8636-c050095f8d37}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\Source\NBody\OctreeSearch.h">
-      <Filter>Source\NBody\UnrealEngine</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\Source\NBody\OctreeSearch.cpp">
-      <Filter>Source\NBody\UnrealEngine</Filter>
-    </ClCompile>
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="..\..\NBody.uproject" />
+		<Filter Include="Source">
+			<UniqueIdentifier>{CAAD4FDF-B5A4-4CD4-BBBF-0CD1A67CAF60}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Source\NBody.Target.cs">
+			<Filter>Source</Filter>
+		</None >
+		<None Include="..\..\Source\NBodyEditor.Target.cs">
+			<Filter>Source</Filter>
+		</None >
+		<Filter Include="Config">
+			<UniqueIdentifier>{C6F0C0F2-B12F-481A-85B4-A19D676C8957}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Config\DefaultEditor.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultEditorPerProjectUserSettings.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultEngine.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultGame.ini">
+			<Filter>Config</Filter>
+		</None >
+		<None Include="..\..\Config\DefaultInput.ini">
+			<Filter>Config</Filter>
+		</None >
+		<Filter Include="Source\NBody">
+			<UniqueIdentifier>{73B1021E-7D60-4379-B740-E6551B6D549C}</UniqueIdentifier>
+		</Filter>
+		<None Include="..\..\Source\NBody\NBody.Build.cs">
+			<Filter>Source\NBody</Filter>
+		</None >
+		<ClCompile Include="..\..\Source\NBody\NBody.cpp">
+			<Filter>Source\NBody</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\NBody\NBody.h">
+			<Filter>Source\NBody</Filter>
+		</ClInclude >
+		<ClCompile Include="..\..\Source\NBody\NBodyGameMode.cpp">
+			<Filter>Source\NBody</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\NBody\NBodyGameMode.h">
+			<Filter>Source\NBody</Filter>
+		</ClInclude >
+		<ClCompile Include="..\..\Source\NBody\OctreeSearch.cpp">
+			<Filter>Source\NBody</Filter>
+		</ClCompile >
+		<ClInclude Include="..\..\Source\NBody\OctreeSearch.h">
+			<Filter>Source\NBody</Filter>
+		</ClInclude >
+	</ItemGroup>
 </Project>

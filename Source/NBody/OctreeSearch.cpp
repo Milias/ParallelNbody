@@ -1,7 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "NBody.h"
-#include "kernel_wrapper.h"
 #include "OctreeSearch.h"
 
 // Sets default values
@@ -21,7 +20,6 @@ void AOctreeSearch::BeginPlay()
 void AOctreeSearch::Tick( float DeltaTime )
 {
   Super::Tick(DeltaTime);
-  print(FString::SanitizeFloat(kernel(1<<20)));
 
   FlushPersistentDebugLines(GetWorld());
   if (PhDeltaTime > 0) {
