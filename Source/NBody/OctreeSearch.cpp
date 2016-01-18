@@ -33,7 +33,7 @@ void AOctreeSearch::Tick( float DeltaTime )
     }
     //output << std::to_string(std::chrono::duration<double>(std::chrono::high_resolution_clock::now()- t1).count()) << std::endl;
   }
-  //DrawOctreeBoxes(ParticleOctree);
+  DrawOctreeBoxes(ParticleOctree);
 }
 
 void AOctreeSearch::DrawOctreeBoxes(Octree* Oct)
