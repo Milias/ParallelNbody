@@ -28,7 +28,6 @@ class NBODY_API AOctreeSearch : public AActor
 
 public:
   TArray<FParticle> Particles;
-
   NBodyKernel *Ker;
 
   bool Initialized;

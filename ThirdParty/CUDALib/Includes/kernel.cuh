@@ -3,7 +3,39 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string>
+#include <fstream>
 #include <vector_types.h>
+
+/*
+  This struct encapsulates the necessary information about
+  masked keys at the building step.
+*/
+struct MaskedKey
+{
+  uint64_t key;
+  uint32_t index;
+
+  __host__ __device__ MaskedKey() : key(0), index(0) {}
+  __host__ __device__ MaskedKey(const MaskedKey &a) : key(a.key), index(a.index) {}
+
+  __host__ __device__ MaskedKey& operator=(const MaskedKey &a) {
+    key = a.key;
+    index = a.index;
+    return *this;
+  }
+
+  __host__ __device__ bool operator==(const MaskedKey &a) const {
+    return key == a.key;
+  }
+};
+
+struct MaskedKeyRemove
+{
+  __host__ __device__ bool operator()(const MaskedKey &a) {
+    return a.key & 1i64;
+  }
+};
 
 struct KerParticle
 {
@@ -11,19 +43,20 @@ struct KerParticle
   float3 Velocity;
   float3 Acceleration;
   uint64_t Morton;
-  uint32_t Parent;
 
-  __host__ __device__ KerParticle() : Morton(0), Parent(0) {}
+  __host__ __device__ KerParticle() : Morton(0) {}
   __host__ __device__ KerParticle& operator=(const KerParticle& p) {
     Position = p.Position;
     Velocity = p.Velocity;
     Acceleration = p.Acceleration;
     Morton = p.Morton;
-    Parent = p.Parent;
     return *this;
   }
 };
 
+/*
+  Comparisons for the boundary box.
+*/
 struct CompareParticleX
 {
   __host__ __device__ bool operator()(const KerParticle &a, const KerParticle &b)
@@ -48,6 +81,9 @@ struct CompareParticleZ
   }
 };
 
+/*
+  Ôctree node, internal or leaf.
+*/
 struct TreeCell
 {
   uint2 Range;
@@ -55,14 +91,9 @@ struct TreeCell
   uint32_t Level;
   bool Leaf;
 
-  uint32_t Parent;
-  uint32_t Child;
-  KerParticle * Particle;
-
+  uint32_t Global, Parent, Child;
   float4 Position;
 
-  __host__ __device__ TreeCell() : Morton(0), Level(0), Leaf(false), Parent(NULL), Child(NULL), Particle(NULL) {}
-  __host__ __device__ ~TreeCell() {}
   __host__ __device__ TreeCell& TreeCell::operator=(const TreeCell& p) {
     Range = p.Range;
     Morton = p.Morton;
@@ -70,52 +101,48 @@ struct TreeCell
     Leaf = p.Leaf;
     Parent = p.Parent;
     Child = p.Child;
-    Particle = p.Particle;
     Position = p.Position;
     return *this;
   }
 };
 
+/*
+  Control class for the Kernel, just an interface to the
+  CUDA implementation.
+
+  As a general rule, d_* are pointers in device memory space.
+*/
+
 class NBodyKernel
 {
 private:
   uint32_t NParticles;
-
-public:
   float4 *RawDataPos, *d_RawDataPos;
-  float3 *RawDataVel, *d_RawDataVel;
-  KerParticle *KerParticles, *d_KerParticles;
-  uint64_t *Encoded, *d_Encoded, *Counts, *d_Counts, *values, *d_values, *temp64, *d_temp64;
+  float3 *d_RawDataVel, *d_Size;
+  KerParticle *d_KerParticles;
+  uint64_t *d_Encoded;
   TreeCell **OctreeCells, **d_OctreeCells;
-  TreeCell *FinalOctreeCells, *d_FinalOctreeCells;
+  TreeCell *d_FinalOctreeCells;
+  MaskedKey *d_Counts, *d_Uniques, *d_Cleaned;
 
-  float3 CubeCornerA, CubeCornerB, Size, *d_Size;
-  bool InitializedCPU, InitializedGPU;
+  bool InitializedGPU;
   float deltaTime;
 
   uint64_t MaxSize;
-  uint32_t MaxDepth, *Temp, *d_Temp, *TreeCellsSizes, totalSize, *ChildrenCounter, *d_ChildrenCounter;
+  uint32_t MaxDepth, *d_Freq, *d_Offset, *d_LevelOffset, *TreeCellsSizes, totalSize, *d_ChildrenCounter;
 
-  NBodyKernel() : InitializedCPU(false), InitializedGPU(false), MaxSize(1 << 20), MaxDepth(21), deltaTime(0) {}
+  std::fstream benchFile;
+  float * benchData;
+  uint32_t benchIt;
+
+public:
+  NBodyKernel() : InitializedGPU(false), MaxSize(1 << 20), MaxDepth(21), deltaTime(0.0), benchIt(0) {}
   ~NBodyKernel();
 
-  void CleanCPU();
   void CleanGPU();
-  void InitializeCPU(uint32_t PartSize, float4 *p, float3 *v, float dt);
   void InitializeGPU(uint32_t PartSize, float4 *p, float3 *v, float dt);
-  void CopyEncodedToHost();
+  void CopyPositionsToHost();
 
-  float4 * GetParticlePosition(uint32_t i) {
-    if (InitializedCPU) {
-      return &(KerParticles[i].Position);
-    } else if (InitializedGPU) {
-      return RawDataPos + i;
-    }
-    return NULL;
-  }
-
+  float4 * GetParticlePosition(uint32_t i) { return RawDataPos + i; }
   void GPUBuildOctree();
-  void CPUBuildOctree();
-
-  KerParticle* GetEncoded() { return KerParticles; }
 };

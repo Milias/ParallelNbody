@@ -23,16 +23,13 @@ void AOctreeSearch::Tick( float DeltaTime )
 
   if (Initialized) {
     Ker->GPUBuildOctree();
-    Ker->CopyEncodedToHost();
+    //Ker->CopyPositionsToHost();
     
-    if (true) {
-      for (int32 i = 0; i < Particles.Num(); i++) {
-        Particles[i].Position.X = Ker->GetParticlePosition(i)->x;
-        Particles[i].Position.Y = Ker->GetParticlePosition(i)->y;
-        Particles[i].Position.Z = Ker->GetParticlePosition(i)->z;
-      }
+    for (int32 i = 0; i < Particles.Num(); i++) {
+      Particles[i].Position.X = Ker->GetParticlePosition(i)->x;
+      Particles[i].Position.Y = Ker->GetParticlePosition(i)->y;
+      Particles[i].Position.Z = Ker->GetParticlePosition(i)->z;
     }
-
     FlushPersistentDebugLines(GetWorld());
 
     UGameplayStatics::GetPlayerController(this, 0)->GetHUD()->RemoveAllDebugStrings();
@@ -41,10 +38,16 @@ void AOctreeSearch::Tick( float DeltaTime )
     }
   }
 }
+/*
+  Function that initializes particles, giving random positions,
+  velocities and masses, as well as initialize the CUDA Kernel.
 
+  Inputs:
+      N - Number of particles.
+      SizeArg - Size of the box where particles are spawned.
+*/
 void AOctreeSearch::CreateSpacePoints(int32 N, float SizeArg)
 {
-  if (N==2000) N = 50;
   FVector s = FVector(SizeArg, SizeArg, SizeArg/10);
   Particles.Empty();
   Particles.SetNum(N);

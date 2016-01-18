@@ -160,9 +160,9 @@
       <CudaRuntime>Static</CudaRuntime>
       <NvccCompilation>compile</NvccCompilation>
       <CodeGeneration>compute_35,sm_35;compute_20,sm_20;compute_20,sm_21</CodeGeneration>
-      <AdditionalOptions>-expt-extended-lambda %(AdditionalOptions)</AdditionalOptions>
       <FastMath>true</FastMath>
       <Emulation>false</Emulation>
+      <Optimization>O3</Optimization>
     </CudaCompile>
     <Lib>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
