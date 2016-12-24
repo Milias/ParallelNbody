@@ -1,9 +1,9 @@
 # ParallelNbody
 Solving the N-body problem using CUDA.
 
-This is a project for Parallel Algorithms, a course at Utrecht Univerisity in the Computer Science
-specialization of Mathematics Master's Program. The objective is to write a parallel program that
-calculates individual trajectories of a number of bodies, taking into account gravitational
+This is a project for Parallel Algorithms, a course at Utrecht University in the Computer Science
+specialization of the Mathematics Master's Program. The objective is to write a parallel program that
+calculates individual trajectories of a large number of bodies, taking into account gravitational
 interactions.
 
 Since the straightforward approach of direct sums over all the bodies in the system has a compu-
